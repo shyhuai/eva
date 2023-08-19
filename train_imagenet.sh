@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# framework settings
+mixed_precision="${mixed_precision:-1}"
+
 # model training settings
 dnn="${dnn:-resnet50}"
 batch_size="${batch_size:-64}"
@@ -32,8 +35,10 @@ kl_clip="${kl_clip:-0.001}"
 damping="${damping:-0.001}"
 ngrads="${ngrads:-32}"
 
+datadir="${datadir:-/home/datasets/imagenet/ILSVRC2012_dataset}"
+
 horovod="${horovod:-1}"
-params="--horovod $horovod --model $dnn --base-lr $base_lr --epochs $epochs --lr-schedule $lrs --lr-decay $lr_decay --kfac-update-freq $kfac --kfac-cov-update-freq $fac --kfac-name $kfac_name --stat-decay $stat_decay --damping $damping --kl-clip $kl_clip --exclude-parts ${exclude_parts} --batch-size $batch_size --batches-per-allreduce $accum --train-dir /localdata/ILSVRC2012_dataset/train --val-dir /localdata/ILSVRC2012_dataset/val --momentum $momentum --weight-decay $weight_decay --opt-name $opt_name --ngrads $ngrads"
+params="--horovod $horovod --model $dnn --base-lr $base_lr --epochs $epochs --lr-schedule $lrs --lr-decay $lr_decay --kfac-update-freq $kfac --kfac-cov-update-freq $fac --kfac-name $kfac_name --stat-decay $stat_decay --damping $damping --kl-clip $kl_clip --exclude-parts ${exclude_parts} --batch-size $batch_size --batches-per-allreduce $accum --train-dir $datadir/train --val-dir $datadir/val --momentum $momentum --weight-decay $weight_decay --opt-name $opt_name --ngrads $ngrads --mixed-precision $mixed_precision"
 
 # multi-node multi-gpu settings
 nworkers="${nworkers:-64}"

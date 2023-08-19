@@ -72,7 +72,7 @@ class KFAC(optim.Optimizer):
         """Default: hook for saving input (a)"""
         if self.hook_enabled and torch.is_grad_enabled() and self.steps % self.fac_update_freq == 0:
             with torch.no_grad():
-                new = get_vector_a(input[0].data[0:self.kfac_batch_size], module)
+                new = get_vector_a(input[0].data[0:self.kfac_batch_size], module).to(dtype=torch.float32)
                 if module not in self.m_a:
                     self.m_a[module] = new
                 else:
@@ -87,7 +87,7 @@ class KFAC(optim.Optimizer):
         """Default: hook for saving gradient w.r.t output (g)"""
         if self.hook_enabled and self.steps % self.fac_update_freq == 0:
             with torch.no_grad():
-                new = get_vector_g(grad_output[0].data[0:self.kfac_batch_size], module)
+                new = get_vector_g(grad_output[0].data[0:self.kfac_batch_size], module).to(dtype=torch.float32)
                 if module not in self.m_g:
                     self.m_g[module] = new
                 else:
@@ -198,6 +198,7 @@ class KFAC(optim.Optimizer):
             grad = module.weight.grad.data
         if module.bias is not None:
             grad = torch.cat([grad, module.bias.grad.data.view(-1, 1)], 1)
+        grad = grad.to(dtype=torch.float32)
         return grad    
 
 

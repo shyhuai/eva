@@ -20,7 +20,7 @@ logger.addHandler(strhdlr)
 
 import wandb
 wandb=False
-SPEED = False
+SPEED = True
 
 import torch
 import torch.backends.cudnn as cudnn
@@ -65,6 +65,10 @@ def initialize():
                         help='tensorboard/checkpoint log directory')
     parser.add_argument('--checkpoint-format', default='checkpoint-{epoch}.pth.tar',
                         help='checkpoint file format')
+    parser.add_argument('--mixed-precision', type=int, default=0,
+                        help='use mixed-precision for training')
+    parser.add_argument('--loss-scale', type=float, default=256,
+                        help='loss scale for mixed-precision training')
     parser.add_argument('--fp16-allreduce', action='store_true', default=False,
                         help='use fp16 compression during allreduce')
     parser.add_argument('--batches-per-allreduce', type=int, default=1,
@@ -412,6 +416,8 @@ def train(epoch, model, optimizer, preconditioner, lr_schedules, lrs,
     profiling=True
     iotimes = [];fwbwtimes=[];kfactimes=[];commtimes=[];uptimes=[]
     ittimes = []
+    if args.mixed_precision:
+        scaler = torch.cuda.amp.GradScaler(init_scale=1024)
     if True:
         for batch_idx, (data, target) in enumerate(train_loader):
             stime = time.time()
@@ -424,18 +430,28 @@ def train(epoch, model, optimizer, preconditioner, lr_schedules, lrs,
             for i in range(0, len(data), args.batch_size):
                 data_batch = data[i:i + args.batch_size]
                 target_batch = target[i:i + args.batch_size]
-                output = model(data_batch)
-                if type(output) == tuple:
-                    output = output[0]
-                
-                loss = loss_func(output, target_batch)
+                if args.mixed_precision:
+                    with torch.autocast(device_type='cuda', dtype=torch.float16):
+                        output = model(data_batch)
+                        if type(output) == tuple:
+                            output = output[0]
+                        loss = loss_func(output, target_batch)
+                else:
+                    output = model(data_batch)
+                    if type(output) == tuple:
+                        output = output[0]
+                    loss = loss_func(output, target_batch)
 
                 with torch.no_grad():
                     train_loss.update(loss)
                     train_accuracy.update(accuracy(output, target_batch))
+                if args.mixed_precision:
+                    loss.div_(math.ceil(float(len(data)) / args.batch_size))
+                    scaler.scale(loss).backward()        
 
-                loss.div_(math.ceil(float(len(data)) / args.batch_size))
-                loss.backward()        
+                else:
+                    loss.div_(math.ceil(float(len(data)) / args.batch_size))
+                    loss.backward()        
             fwbwtime = time.time()
             fwbwtimes.append(fwbwtime-iotime)
 
@@ -449,9 +465,17 @@ def train(epoch, model, optimizer, preconditioner, lr_schedules, lrs,
             kfactimes.append(kfactime-commtime)
             if args.horovod:
                 with optimizer.skip_synchronize():
-                    optimizer.step()
+                    if args.mixed_precision:
+                        scaler.step(optimizer)
+                        scaler.update()
+                    else:
+                        optimizer.step()
             else:
-                optimizer.step()
+               if args.mixed_precision:
+                   scaler.step(optimizer)
+                   scaler.update()
+               else:
+                   optimizer.step()
             updatetime=time.time()
             uptimes.append(updatetime-kfactime)
             avg_time += (time.time()-stime)

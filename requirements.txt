@@ -11,3 +11,5 @@ transformers==4.15.0
 
 # others
 wandb==0.12.11
+tqdm
+ml_collections

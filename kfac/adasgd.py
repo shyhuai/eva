@@ -33,7 +33,8 @@ class KFAC(optim.Optimizer):
                  factor_decay=0.95,
                  exclude_vocabulary_size=None,
                  hook_enabled=True,
-                 exclude_parts=''):
+                 exclude_parts='',
+                 args=None):
 
         # For compatibility with `KFACParamScheduler`
         defaults = dict(lr=lr,

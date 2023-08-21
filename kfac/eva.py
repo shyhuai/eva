@@ -33,7 +33,8 @@ class KFAC(optim.Optimizer):
                  factor_decay=0.95,
                  exclude_vocabulary_size=None,
                  hook_enabled=True,
-                 exclude_parts=''):
+                 exclude_parts='',
+                 args=None):
 
         # For compatibility with `KFACParamScheduler`
         defaults = dict(lr=lr,
@@ -43,6 +44,7 @@ class KFAC(optim.Optimizer):
 
         super(KFAC, self).__init__(model.parameters(), defaults)
 
+        self.args = args
         self.fac_update_freq = fac_update_freq
         self.kfac_batch_size = kfac_batch_size
         self.kl_clip = kl_clip if (kl_clip is not None and kl_clip >= 0) else None
@@ -87,7 +89,11 @@ class KFAC(optim.Optimizer):
         """Default: hook for saving gradient w.r.t output (g)"""
         if self.hook_enabled and self.steps % self.fac_update_freq == 0:
             with torch.no_grad():
+                # Note that the backprogated gradients are scaled with mixed-precision
+                # Thus, to ensure it matches the same scaling with feed-forward, it should be unscaled
                 new = get_vector_g(grad_output[0].data[0:self.kfac_batch_size], module).to(dtype=torch.float32)
+                if self.args.mixed_precision:
+                    new /= self.args.loss_scale
                 if module not in self.m_g:
                     self.m_g[module] = new
                 else:
@@ -199,6 +205,8 @@ class KFAC(optim.Optimizer):
         if module.bias is not None:
             grad = torch.cat([grad, module.bias.grad.data.view(-1, 1)], 1)
         grad = grad.to(dtype=torch.float32)
+        if self.args.mixed_precision:
+            grad /= self.args.loss_scale
         return grad    
 
 

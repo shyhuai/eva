@@ -67,7 +67,7 @@ def initialize():
                         help='checkpoint file format')
     parser.add_argument('--mixed-precision', type=int, default=0,
                         help='use mixed-precision for training')
-    parser.add_argument('--loss-scale', type=float, default=256,
+    parser.add_argument('--loss-scale', type=float, default=1024,
                         help='loss scale for mixed-precision training')
     parser.add_argument('--fp16-allreduce', action='store_true', default=False,
                         help='use fp16 compression during allreduce')
@@ -195,7 +195,7 @@ def initialize():
     
     algo = args.kfac_name if args.use_kfac else args.opt_name
     #logfile = './logs/debug_imagenet_{}_lr{}_bs{}_gpu{}_kfac{}_{}_damping{}.log'.format(args.model, args.base_lr, args.batch_size, backend.comm.size(), args.kfac_update_freq, algo, args.damping)
-    logfile = './logs/imagenet_{}_bs{}_gpu{}_kfac{}_{}_lr{}_wd{}.log'.format(args.model, args.batch_size, backend.comm.size(), args.kfac_update_freq, algo, args.base_lr, args.weight_decay)
+    logfile = './logs/imagenet_{}_bs{}_gpu{}_kfac{}_{}_lr{}_wd{}_mp{}.log'.format(args.model, args.batch_size, backend.comm.size(), args.kfac_update_freq, algo, args.base_lr, args.weight_decay, args.mixed_precision)
     hdlr = logging.FileHandler(logfile)
     hdlr.setFormatter(formatter)
     logger.addHandler(hdlr) 
@@ -344,7 +344,8 @@ def get_model(args):
                 #diag_blocks=args.diag_blocks,
                 #diag_warmup=args.diag_warmup,
                 #distribute_layer_factors=args.distribute_layer_factors, 
-                exclude_parts=args.exclude_parts)
+                exclude_parts=args.exclude_parts,
+                args=args)
         #kfac_param_scheduler = kfac.KFACParamScheduler(
         #        preconditioner,
         #        damping_alpha=args.damping_alpha,
@@ -417,7 +418,11 @@ def train(epoch, model, optimizer, preconditioner, lr_schedules, lrs,
     iotimes = [];fwbwtimes=[];kfactimes=[];commtimes=[];uptimes=[]
     ittimes = []
     if args.mixed_precision:
-        scaler = torch.cuda.amp.GradScaler(init_scale=1024)
+        scaler = torch.cuda.amp.GradScaler(init_scale=args.loss_scale,
+                growth_factor=2,
+                backoff_factor=0.5,
+                growth_interval=100,
+                enabled=True)
     if True:
         for batch_idx, (data, target) in enumerate(train_loader):
             stime = time.time()
@@ -448,7 +453,6 @@ def train(epoch, model, optimizer, preconditioner, lr_schedules, lrs,
                 if args.mixed_precision:
                     loss.div_(math.ceil(float(len(data)) / args.batch_size))
                     scaler.scale(loss).backward()        
-
                 else:
                     loss.div_(math.ceil(float(len(data)) / args.batch_size))
                     loss.backward()        
@@ -460,7 +464,11 @@ def train(epoch, model, optimizer, preconditioner, lr_schedules, lrs,
             commtime = time.time()
             commtimes.append(commtime-fwbwtime)
             if preconditioner is not None:
-                preconditioner.step(epoch=epoch)
+                if args.mixed_precision:
+                    scaler.unscale_(optimizer)
+                    preconditioner.step(epoch=epoch)
+                else:
+                    preconditioner.step(epoch=epoch)
             kfactime = time.time()
             kfactimes.append(kfactime-commtime)
             if args.horovod:

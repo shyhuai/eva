@@ -15,7 +15,7 @@ rdma="${rdma:-1}"
 if [ "$rdma" = "0" ]; then
 net_params="-mca pml ob1 -mca btl ^openib \
     -mca btl_tcp_if_include ${ETH_MPI_BTC_TCP_IF_INCLUDE} \
-    -x NCCL_DEBUG=INFO  \
+    -x NCCL_DEBUG=VERSION \
     -x NCCL_SOCKET_IFNAME=${ETH_INTERFACE} \
     -x NCCL_IB_DISABLE=1 \
     -x HOROVOD_CACHE_CAPACITY=0"
@@ -26,7 +26,7 @@ net_params="--mca pml ob1 --mca btl openib,vader,self --mca btl_openib_allow_ib 
     -x LD_LIBRARY_PATH  \
     -x NCCL_IB_DISABLE=0 \
     -x NCCL_SOCKET_IFNAME=${IB_INTERFACE} \
-    -x NCCL_DEBUG=INFO \
+    -x NCCL_DEBUG=VERSION \
     -x HOROVOD_CACHE_CAPACITY=0"
 fi
 

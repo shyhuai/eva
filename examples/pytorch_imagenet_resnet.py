@@ -19,8 +19,8 @@ strhdlr.setFormatter(formatter)
 logger.addHandler(strhdlr) 
 
 import wandb
-wandb=False
-SPEED = True
+#wandb=False
+SPEED = False
 
 import torch
 import torch.backends.cudnn as cudnn
@@ -67,7 +67,7 @@ def initialize():
                         help='checkpoint file format')
     parser.add_argument('--mixed-precision', type=int, default=0,
                         help='use mixed-precision for training')
-    parser.add_argument('--loss-scale', type=float, default=1024,
+    parser.add_argument('--loss-scale', type=float, default=8,
                         help='loss scale for mixed-precision training')
     parser.add_argument('--fp16-allreduce', action='store_true', default=False,
                         help='use fp16 compression during allreduce')
@@ -203,7 +203,7 @@ def initialize():
         logger.info(args)
     
     if args.verbose and wandb:
-        wandb.init(project="kfac", entity="hkust-distributedml", name=logfile, config=args)
+        wandb.init(project="Eva", entity="shyhuai", name=logfile, config=args)
 
     return args
 
@@ -213,8 +213,8 @@ def get_datasets(args):
         torch.set_num_threads(4)
         kwargs = {'num_workers': 8, 'pin_memory': True} if args.cuda else {}
     else:
-        torch.set_num_threads(8)
-        kwargs = {'num_workers': 8, 'pin_memory': True} if args.cuda else {}
+        torch.set_num_threads(4)
+        kwargs = {'num_workers': 4, 'pin_memory': True} if args.cuda else {}
 
     train_dataset = datasets.ImageFolder(
             args.train_dir,

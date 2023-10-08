@@ -50,7 +50,7 @@ class KFAC(optim.Optimizer):
         self.beta1 = args.beta1
         self.beta2 = args.beta2
         self.kl_clip = kl_clip if (kl_clip is not None and kl_clip >= 0) else None
-        self.factor_decay = factor_decay
+        self.factor_decay = 0 #factor_decay
         self.exclude_vocabulary_size = exclude_vocabulary_size
         self.hook_enabled = hook_enabled
         
@@ -82,6 +82,8 @@ class KFAC(optim.Optimizer):
                     self.m_a[module] = new
                 else:
                     self.m_a[module].mul_(1-self.factor_decay).add_(new, alpha=self.factor_decay)
+                if (self.beta1 > 0 or self.beta2 > 0) and module not in self.module_states:
+                    self.module_states[module] = {}
             if backend.comm.size() > 1:
                 self.handles.append(backend.comm.allreduce_async_(self.m_a[module], op=backend.comm.Average))
 
@@ -152,7 +154,7 @@ class KFAC(optim.Optimizer):
                         self.module_states[module]['g1'] = grad
                     else:
                         oldgrad = self.module_states[module]['g1']
-                        oldv.mul_(1-self.beta1).add_(grad, alpha=self.beta1)
+                        oldgrad.mul_(1-self.beta1).add_(grad, alpha=self.beta1)
                         grad = oldgrad
 
                 if self.beta2 > 0:

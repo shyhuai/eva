@@ -19,7 +19,7 @@ strhdlr.setFormatter(formatter)
 logger.addHandler(strhdlr) 
 
 import wandb
-SPEED = True
+SPEED = False
 if SPEED:
     wandb=False
 
@@ -120,6 +120,10 @@ def initialize():
                         help='KFAC update freq schedule (default None)')
     parser.add_argument('--stat-decay', type=float, default=0.95,
                         help='Alpha value for covariance accumulation (default: 0.95)')
+    parser.add_argument('--beta1', type=float, default=0.95,
+                        help='Alpha value for grad accumulation (default: 0.95 for Deva)')
+    parser.add_argument('--beta2', type=float, default=0.995,
+                        help='Alpha value for correction grad accumulation (default: 0.995 for Deva)')
     parser.add_argument('--damping', type=float, default=0.001,
                         help='KFAC damping factor (default 0.001)')
     parser.add_argument('--damping-alpha', type=float, default=0.5,

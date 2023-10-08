@@ -75,6 +75,10 @@ class _HorovodBackend:
             return hvd.Sum
         else:
             raise ValueError('Unknown communication operation {}'.format(op))
+
+    def reduce(self, tensor, dst, name=None, op=Ops.Average):
+        op = self._get_op(op)
+        hvd.allreduce_(tensor, name=name, op=op) # in-place synchronous all-reduce
     
     def allreduce(self, tensor, name=None, op=Ops.Average):
         self.allreduce_(tensor, name, op)
@@ -129,6 +133,18 @@ class _TorchBackend:
 
     def new_group(self, ranks):
         return dist.new_group(ranks)
+
+    def reduce_async_(self, tensor, dst, name=None, op=Ops.Average):
+        handle = dist.reduce(tensor, dst, async_op=True)
+        if op == Ops.SUM:
+            return handle
+        else:
+            return (handle, tensor)
+
+    def reduce(self, tensor, dst, name=None, op=Ops.Average):
+        dist.reduce(tensor, dst, async_op=False)
+        if op == Ops.Average:
+            tensor.div_(self.size())
         
     def allreduce(self, tensor, name=None, op=Ops.Average):
         self.allreduce_(tensor, name, op)

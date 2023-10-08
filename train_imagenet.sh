@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # framework settings
-mixed_precision="${mixed_precision:-1}"
+mixed_precision="${mixed_precision:-0}"
 
 # model training settings
 dnn="${dnn:-resnet50}"

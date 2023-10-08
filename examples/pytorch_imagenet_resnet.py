@@ -19,8 +19,9 @@ strhdlr.setFormatter(formatter)
 logger.addHandler(strhdlr) 
 
 import wandb
-#wandb=False
-SPEED = False
+SPEED = True
+if SPEED:
+    wandb=False
 
 import torch
 import torch.backends.cudnn as cudnn

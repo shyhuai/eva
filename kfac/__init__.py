@@ -1,4 +1,5 @@
 from kfac.eva import KFAC as EVA
+from kfac.deva import KFAC as DEVA
 from kfac.kfac import KFAC as KFAC 
 from kfac.sam import KFAC as SAM
 from kfac.adasgd import KFAC as ADASGD
@@ -7,6 +8,7 @@ from kfac.kfac import KFACParamScheduler
 
 kfac_mappers = {
     'eva': EVA,
+    'deva': DEVA,
     'kfac': KFAC,
     'adasgd': ADASGD,
     'adasgd2': ADASGD2,

@@ -1,0 +1,13 @@
+{
+	"model_config_file": "config/bert_large_uncased_config.json",
+	"fp16": true,
+	"max_predictions_per_seq": 20,
+	"learning_rate": 6e-4,
+	"warmup_proportion": 0.2843,
+	"global_batch_size": 65536,
+	"local_batch_size": 32,
+	"max_steps": 8000,
+	"kfac": false,
+	"kfac_inv_interval": 10,
+	"kfac_factor_interval": 1
+}

@@ -1,0 +1,20 @@
+{
+	"model_config_file": "config/bert_large_uncased_config.json",
+	"fp16": true,
+	"max_predictions_per_seq": 76,
+	"learning_rate": 0.002,
+	"beta1": 0.9,
+	"beta2": 0.0,
+	"damping": 0.3,
+	"lr_decay": "cosine",
+	"warmup_proportion": 0.001,
+	"global_batch_size": 128,
+	"local_batch_size": 16,
+	"max_steps": 6000,
+	"previous_phase_end_step": 0,
+	"optimizer": "deva",
+	"kfac": false,
+	"kfac_inv_interval": 10,
+	"kfac_factor_interval": 1,
+	"log_prefix": "phase2_log"
+}

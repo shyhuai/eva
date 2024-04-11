@@ -354,23 +354,37 @@ def set_no_decay(model, optimizer):
 
 
 def get_optimizer(grouped_parameters, lr, model, optimizer_name, weight_decay=0.01):
-    if optimizer_name in ['eva', 'deva']:
+    if optimizer_name in ['eva', 'deva', 'devalamb']:
         eva_backend.init("Torch")
         sgd_layers = []
-        #sgd_layers = [module for module in model.modules() if
-        #              isinstance(module, torch.nn.Linear) and module.out_features == 30528]
-        # backend = comm.get_comm_backend()
-        # optimizer = eva.Eva(model, lr=lr, sgd_layers=sgd_layers,
-        #                         optimizer=FusedLAMB(grouped_parameters, lr=lr),
-        #                     )
-        # the repository use lamb here
         if optimizer_name == 'eva':
             optimizer = eva.Eva(model, lr=lr, sgd_layers=sgd_layers,
                                 optimizer=FusedLAMB(grouped_parameters, lr=lr, betas=(0.86,0.975)),
                             )
-        else:
+        elif optimizer_name == 'deva':
             optimizer = deva.Deva(model, lr=lr, sgd_layers=sgd_layers,
                                 optimizer=FusedLAMB(grouped_parameters, lr=lr, betas=(0.86,0.975)), args=args, damping=args.damping)
+        else:
+            lamb_parameters = []
+            eva_parameters = []
+            lamb_names = []
+            eva_names = []
+            supported_modules = ['Linear', 'Conv2d', 'LinearActivation']
+            #supported_modules = ['Linear', 'Conv2d']
+            sgd_layers = [module for module in model.modules() if
+                      isinstance(module, torch.nn.Linear) and module.out_features == 30528]
+            for module in model.modules():
+                if module.__class__.__name__ in supported_modules:
+                    e_p = {"params":module.parameters()}
+                    eva_parameters.append(e_p)
+                elif len([mc for mc in module.named_children()]) == 0 and module.__class__.__name__ != "Identity":
+                    l_p1 = {"params":module.parameters()}
+                    lamb_parameters.append(l_p1)
+                else:
+                    continue
+            optimizer = deva.Deva(model, lr=lr, sgd_layers=sgd_layers,
+                                optimizer=SGD(eva_parameters, lr=lr, momentum=0.9, weight_decay=args.weight_decay),
+                                optimizer2=FusedLAMB(lamb_parameters, lr=0.002, betas=(0.86,0.975)), args=args, damping=args.damping)
         return optimizer
     elif optimizer_name == 'lamb':
         return FusedLAMB(grouped_parameters, lr=lr, betas=(0.86,0.975))
@@ -708,7 +722,7 @@ def main(args):
                            "average_loss":average_loss,
                            "step_loss":current_loss,
                            "learning_rate":optimizer.param_groups[0]['lr']})
-                    if args.optimizer in ['eva', 'deva']:
+                    if args.optimizer in ['eva', 'deva', 'devalamb']:
                         wandb.log(
                             {'vg_sum':optimizer.vg_sum,
                             "damping":optimizer.damping,
@@ -775,7 +789,7 @@ if __name__ == "__main__":
     torch.cuda.manual_seed(args.seed + args.local_rank)
 
     args = setup_training(args)
-    logfile = './logs/bert_pretraining_phase2_{}_bs{}_gpu{}_kfac{}_{}_lr{}_wd{}_mp{}_maxstep{}_bone{}_btwo{}_d{}.log'.format('bert-large', args.local_batch_size, get_world_size(), 1 if args.optimizer in ['eva', 'deva'] else 0, args.optimizer, args.learning_rate, args.weight_decay, 0, args.max_steps, args.beta1, args.beta2, args.damping)
+    logfile = './logs/bert_pretraining_phase2_{}_bs{}_gpu{}_kfac{}_{}_lr{}_wd{}_mp{}_maxstep{}_bone{}_btwo{}_d{}.log'.format('bert-large', args.local_batch_size, get_world_size(), 1 if args.optimizer in ['eva', 'deva', 'devalamb'] else 0, args.optimizer, args.learning_rate, args.weight_decay, 0, args.max_steps, args.beta1, args.beta2, args.damping)
     if is_main_process():
         import wandb
         wandb.init(project="Eva",name=logfile,notes=args.additional,mode='offline')

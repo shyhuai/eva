@@ -37,6 +37,7 @@ class Deva(optim.Optimizer):
                  hook_enabled=True,
                  exclude_parts='',
                  grad_scale=1.0,
+                 optimizer2=None,
                  args=None):
 
         # For compatibility with `KFACParamScheduler`
@@ -60,7 +61,7 @@ class Deva(optim.Optimizer):
         self.beta1 = args.beta1
         self.beta2 = args.beta2
         self.kl_clip = kl_clip if (kl_clip is not None and kl_clip >= 0) else None
-        self.factor_decay = 0 
+        self.factor_decay = 0.9
         self.exclude_vocabulary_size = exclude_vocabulary_size
         self.hook_enabled = hook_enabled
         
@@ -80,11 +81,14 @@ class Deva(optim.Optimizer):
         self.steps = 0
 
         self.optimizer = optimizer
+        self.optimizer2 = optimizer2
         self.param_groups = optimizer.param_groups
         self.param_groups[0]['step'] = 0
         self.vg_sum = 0
+
     def update_grad_scale(self, scaler):
         self.loss_scale = scaler
+
     ### Register hooks
     def set_hook_enabled(self, mode=True):
         self.hook_enabled = mode
@@ -124,7 +128,8 @@ class Deva(optim.Optimizer):
 
     def _register_module_hooks(self, model):
         """Register forard/backward hooks to supported modules"""
-        supported_modules = {'Linear', 'Conv2d'}
+        supported_modules = {'Linear', 'Conv2d', 'LinearActivation'}
+        #supported_modules = {'Linear', 'Conv2d'}
         name_idx = 0
         for module in model.modules():
             if module in self.sgd_layers:
@@ -169,18 +174,18 @@ class Deva(optim.Optimizer):
             if (self.beta1 > 0 or self.beta2 > 0) and module in self.module_states:
                 if self.beta1 > 0:
                     if 'g1' not in self.module_states[module]:
-                        self.module_states[module]['g1'] = grad
+                        self.module_states[module]['g1'] = torch.clone(grad).detach()
                     else:
                         oldgrad = self.module_states[module]['g1']
-                        oldgrad.mul_(1-self.beta1).add_(grad, alpha=self.beta1)
+                        oldgrad.mul_(self.beta1).add_(grad, alpha=1-self.beta1)
                         grad = oldgrad
 
                 if self.beta2 > 0:
                     if 'g2' not in self.module_states[module]:
-                        self.module_states[module]['g2'] = v
+                        self.module_states[module]['g2'] = torch.clone(v).detach()
                     else:
                         oldv = self.module_states[module]['g2']
-                        oldv.mul_(1-self.beta2).add_(v, alpha=self.beta2)
+                        oldv.mul_(self.beta2).add_(v, alpha=1-self.beta2)
                         v = oldv
             v.add_(grad)
             v.div_(self.damping)
@@ -262,5 +267,7 @@ class Deva(optim.Optimizer):
         self._precondition_grads()
 
         self.optimizer.step()
+        if self.optimizer2 is not None:
+            self.optimizer2.step()
         self.steps += 1
         self.param_groups[0]['step'] += 1

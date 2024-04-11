@@ -28,7 +28,7 @@ def _extract_patches(x, kernel_size, stride, padding):
 
 def get_vector_a(a, layer):
     """Return vectorized input activation (m_a)"""
-    if isinstance(layer, nn.Linear): 
+    if isinstance(layer, nn.Linear) or layer.__class__.__name__ == 'LinearActivation': 
         a = torch.mean(a, list(range(len(a.shape)))[0:-1])
         if layer.bias is not None:
             a = torch.cat([a, a.new(1).fill_(1)])
@@ -49,7 +49,7 @@ def get_vector_a(a, layer):
 
 def get_vector_g(g, layer):
     """Return vectorized deviation w.r.t. the pre-activation output (m_g)"""
-    if isinstance(layer, nn.Linear):
+    if isinstance(layer, nn.Linear) or layer.__class__.__name__ == 'LinearActivation':
         g = torch.mean(g, list(range(len(g.shape)))[0:-1])
         return g
 
@@ -62,7 +62,7 @@ def get_vector_g(g, layer):
 
 def get_factor_A(a, layer):
     """Return KF A"""
-    if isinstance(layer, nn.Linear): 
+    if isinstance(layer, nn.Linear) or layer.__class__.__name__ == 'LinearActivation': 
         if len(a.shape) > 2:
             a = torch.mean(a, list(range(len(a.shape)))[1:-1]) # average on sequential dim (if any)
         if layer.bias is not None:
@@ -82,7 +82,7 @@ def get_factor_A(a, layer):
 
 def get_factor_G(g, layer):
     """Return KF G"""
-    if isinstance(layer, nn.Linear):
+    if isinstance(layer, nn.Linear) or layer.__class__.__name__ == 'LinearActivation':
         if len(g.shape) > 2:
             g = torch.mean(g, list(range(len(g.shape)))[1:-1]) # average on sequential dim (if any)
         return g.t() @ (g / g.size(0))
